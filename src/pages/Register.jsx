@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import Button from '../components/common/Button';
 import { Home, User, Mail, Lock, Phone } from 'lucide-react';
 import cityscapeBg from '../assets/login_bg.png';
+import { useAuth } from '../context/AuthContext';
+import SocialLogin from '../components/common/SocialLogin';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -11,6 +13,60 @@ export default function Register() {
     apartment: "", family_details: "", family_members: 1, communication: "",
     photo: null, terms: false, worker_type: "", work: "", time: "", seperate_work: ""
   });
+  const [loading, setLoading] = useState(false);
+
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  useEffect(() => {
+    // Parse URL hash fragment
+    const hash = window.location.hash;
+    if (hash) {
+      const params = new URLSearchParams(hash.substring(1));
+      const idToken = params.get("id_token");
+      const state = params.get("state");
+      
+      if (idToken) {
+        // Clear hash from URL immediately
+        window.history.replaceState(null, null, window.location.pathname);
+        
+        let provider = "google";
+        if (state && state.startsWith("apple")) {
+          provider = "apple";
+        }
+        
+        handleSocialAuth(provider, idToken);
+      }
+    }
+  }, []);
+
+  const handleSocialAuth = async (provider, token) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/auth/${provider}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: token }),
+      });
+      
+      const data = await res.json();
+      if (res.ok && data.user) {
+        alert(data.message || "Authentication successful!");
+        login(data.user, data.token);
+        
+        setTimeout(() => {
+          navigate(data.user.role === 'security' ? "/security/visitor-log" : "/dashboard");
+        }, 500);
+      } else {
+        alert(data.error || `${provider} authentication failed.`);
+      }
+    } catch (err) {
+      console.error(`${provider} auth error:`, err);
+      alert("Connection error during social sign in.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked, files } = e.target;
@@ -148,7 +204,21 @@ export default function Register() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full py-4 text-lg font-bold rounded-2xl mt-6 shadow-xl">Register Account</Button>
+          <Button type="submit" disabled={loading} className="w-full py-4 text-lg font-bold rounded-2xl mt-6 shadow-xl disabled:opacity-75 disabled:cursor-not-allowed">
+            {loading ? "Registering..." : "Register Account"}
+          </Button>
+
+          <div className="relative flex items-center py-4">
+            <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+            <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-sm font-bold uppercase tracking-wider">Or register with</span>
+            <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+          </div>
+
+          <SocialLogin 
+            onAuthStart={() => setLoading(true)}
+            onAuthSuccess={handleSocialAuth}
+            onAuthFailure={(err) => { setLoading(false); alert("⚠️ " + err); }}
+          />
         </form>
         <p className="text-center text-gray-500 font-medium mt-8">Already have an account? <Link to="/login" className="text-indigo-600 font-bold hover:text-indigo-700">Login here</Link></p>
       </div>

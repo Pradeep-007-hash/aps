@@ -1,3 +1,9 @@
+import dotenv from "dotenv";
+dotenv.config();
+
+console.log("🔍 Backend loaded GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID);
+console.log("🔍 Backend loaded JWT_SECRET:", process.env.JWT_SECRET ? "Present (Verified)" : "Missing (Error)");
+
 import express, { json } from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
@@ -6,6 +12,9 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
+import appleSignin from "apple-signin-auth";
 
 const { hash, compare } = bcrypt;
 const { memoryStorage } = multer;
@@ -44,7 +53,8 @@ const storage = memoryStorage();
 const upload = multer({ storage: storage });
 
 // ----------------- MongoDB CONNECTION -----------------
-const uri = "mongodb+srv://2312034:Pradeep@pradeepdatabase.iszxesl.mongodb.net/?retryWrites=true&w=majority&appName=PradeepDatabase";
+const fallbackUri = "mongodb+srv://2312034:Pradeep@pradeepdatabase.iszxesl.mongodb.net/?retryWrites=true&w=majority&appName=PradeepDatabase";
+const uri = process.env.MONGO_URI || fallbackUri;
 const client = new MongoClient(uri);
 
 let db;
@@ -114,6 +124,17 @@ async function connectDB() {
     } else {
       console.log("Security user already exists.");
     }
+
+    // Seed complaints if collection is empty
+    const complaintsCount = await db.collection("complaints").countDocuments();
+    if (complaintsCount === 0) {
+      await db.collection("complaints").insertMany([
+        { id: '#CMP-001', title: 'Leaky Faucet in Kitchen', status: 'Pending', date: 'Oct 10, 2023', type: 'Plumbing', createdAt: new Date('2023-10-10') },
+        { id: '#CMP-002', title: 'Hallway Light Broken', status: 'Resolved', date: 'Oct 05, 2023', type: 'Electrical', createdAt: new Date('2023-10-05') },
+        { id: '#CMP-003', title: 'Gym Equipment Maintenance', status: 'In Progress', date: 'Oct 12, 2023', type: 'Facility', createdAt: new Date('2023-10-12') },
+      ]);
+      console.log("✅ Complaints seeded successfully.");
+    }
   } catch (err) {
     console.error("❌ MongoDB Connection Failed:", err.message);
     process.exit(1);
@@ -136,6 +157,116 @@ const transporter = nodemailer.createTransport({
 // Utility function to generate a 6-digit OTP
 function generateOTP() {
     return (randomBytes(4).readUInt32LE(0) % 1000000).toString().padStart(6, '0');
+}
+
+// Generate signed JWT token
+function generateToken(user) {
+  return jwt.sign(
+    { 
+      user: { 
+        id: user._id.toString(), 
+        role: user.role 
+      } 
+    },
+    process.env.JWT_SECRET || "your_jwt_secret_key_here",
+    { expiresIn: "7d" }
+  );
+}
+
+// Generate unique username based on email
+async function generateUniqueUsername(email, dbConn) {
+  const prefix = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+  let username = prefix;
+  let exists = await dbConn.collection("users").findOne({ username });
+  let count = 1;
+  while (exists) {
+    username = `${prefix}${count}`;
+    exists = await dbConn.collection("users").findOne({ username });
+    count++;
+  }
+  return username;
+}
+
+// Google ID token verification
+async function verifyGoogleToken(idToken) {
+  if (idToken.startsWith("mock_google_token")) {
+    console.log("ℹ️ Using Google Mock Token for verification");
+    let email = "mock.google.user@example.com";
+    if (idToken.startsWith("mock_google_token_")) {
+      email = idToken.substring("mock_google_token_".length);
+    }
+    const namePart = email.split("@")[0];
+    const firstname = namePart.split(".")[0] || "MockGoogle";
+    const lastname = namePart.split(".")[1] || "User";
+    return {
+      email,
+      email_verified: true,
+      sub: "mock_google_" + namePart,
+      firstname: firstname.charAt(0).toUpperCase() + firstname.slice(1),
+      lastname: lastname.charAt(0).toUpperCase() + lastname.slice(1),
+      picture: "https://lh3.googleusercontent.com/a/mock"
+    };
+  }
+
+  try {
+    const clientID = process.env.GOOGLE_CLIENT_ID;
+    const client = new OAuth2Client(clientID);
+    const ticket = await client.verifyIdToken({
+        idToken,
+        audience: clientID,
+    });
+    const payload = ticket.getPayload();
+    if (payload) {
+      return {
+        email: payload.email,
+        email_verified: payload.email_verified,
+        sub: payload.sub,
+        firstname: payload.given_name || payload.name || "Google",
+        lastname: payload.family_name || "",
+        picture: payload.picture
+      };
+    }
+  } catch (err) {
+    console.error("❌ Google Token Verification Error:", err.message);
+  }
+  return null;
+}
+
+// Apple ID token verification
+async function verifyAppleToken(idToken) {
+  if (idToken.startsWith("mock_apple_token")) {
+    console.log("ℹ️ Using Apple Mock Token for verification");
+    let email = "mock.apple.user@example.com";
+    if (idToken.startsWith("mock_apple_token_")) {
+      email = idToken.substring("mock_apple_token_".length);
+    }
+    const namePart = email.split("@")[0];
+    const firstname = namePart.split(".")[0] || "MockApple";
+    const lastname = namePart.split(".")[1] || "User";
+    return {
+      email,
+      sub: "mock_apple_" + namePart,
+      firstname: firstname.charAt(0).toUpperCase() + firstname.slice(1),
+      lastname: lastname.charAt(0).toUpperCase() + lastname.slice(1),
+    };
+  }
+
+  try {
+    const payload = await appleSignin.verifyIdToken(idToken, {
+      audience: process.env.APPLE_CLIENT_ID,
+    });
+    if (payload) {
+      return {
+        email: payload.email,
+        sub: payload.sub,
+        firstname: "Apple",
+        lastname: "User",
+      };
+    }
+  } catch (err) {
+    console.error("❌ Apple Token Verification Error:", err.message);
+  }
+  return null;
 }
 
 
@@ -250,16 +381,22 @@ app.post("/api/verify-otp", async (req, res) => {
         // 4. Invalidate the specific OTP token used after successful verification
         await db.collection("otp_tokens").deleteOne({ _id: tokenEntry._id });
 
-        // 5. Successful Login
+        // 5. Generate token
+        const token = generateToken(user);
+
+        // 6. Successful Login
         res.status(200).json({
             success: true,
             message: "✅ OTP verified. Login successful!",
+            token,
             user: {
                 id: user._id.toString(),
                 firstname: user.firstname,
                 lastname: user.lastname,
+                username: user.username,
                 role: user.role,
                 status: user.status,
+                image: user.image || null,
             },
         });
 
@@ -647,6 +784,7 @@ app.post("/login", async (req, res) => {
 
 res.json({
   message: "✅ Login successful",
+  token: generateToken(user),
   user: {
     id: user._id.toString(),
     firstname: user.firstname,
@@ -662,6 +800,225 @@ res.json({
   } catch (err) {
     console.error("❌ Login Error:", err);
     res.status(500).json({ error: "Server error during login" });
+  }
+});
+
+
+// ----------------- SOCIAL AUTHENTICATION APIs -----------------
+
+// POST - Authenticate with Google
+app.post("/auth/google", async (req, res) => {
+  const { credential } = req.body;
+  
+  if (!credential) {
+    return res.status(400).json({ error: "Google credential token is required." });
+  }
+
+  try {
+    console.log("🔍 Google Auth: Attempting to verify credential...");
+    
+    // Verify the Google ID token using OAuth2Client
+    const payload = await verifyGoogleToken(credential);
+    
+    if (!payload) {
+      console.error("❌ Google Token Verification Failed");
+      return res.status(401).json({ error: "Invalid Google credential. Token verification failed." });
+    }
+
+    console.log("✅ Google Token Verified for email:", payload.email);
+    
+    const { email, sub, firstname, lastname, picture } = payload;
+
+    // 1. Look for user by provider/providerId
+    let user = await db.collection("users").findOne({ provider: "google", providerId: sub });
+
+    // 2. If not found by provider, check by email
+    if (!user) {
+      console.log("👤 User not found by provider, checking by email...");
+      user = await db.collection("users").findOne({ email });
+      
+      if (user) {
+        console.log("👤 User found by email, linking Google provider...");
+        // Link the provider to the existing account
+        const updateFields = {
+          provider: "google",
+          providerId: sub
+        };
+        // Update profile picture if user doesn't already have one
+        if (!user.image && picture) {
+          updateFields.profilePicture = picture;
+        }
+        await db.collection("users").updateOne(
+          { _id: user._id },
+          { $set: updateFields }
+        );
+        // Refresh the user object
+        user = await db.collection("users").findOne({ _id: user._id });
+      } else {
+        console.log("👤 User not found, creating new account...");
+        // Create a new account automatically
+        const generatedUsername = await generateUniqueUsername(email, db);
+        const dummyPassword = await hash(randomBytes(16).toString("hex"), 10);
+        
+        const newUser = {
+          firstname,
+          lastname,
+          username: generatedUsername,
+          email,
+          phone: "",
+          password: dummyPassword,
+          role: "member", // default role
+          door_no: "",
+          floor_no: "",
+          apartment: "",
+          family_details: "",
+          family_members: [],
+          communication: "",
+          worker_type: "",
+          work: "",
+          seperate_work: "",
+          time: "",
+          terms: true,
+          status: "APPROVED", // Auto-approved for social login
+          provider: "google",
+          providerId: sub,
+          profilePicture: picture,
+          createdAt: new Date()
+        };
+
+        const result = await db.collection("users").insertOne(newUser);
+        user = { ...newUser, _id: result.insertedId };
+        console.log("✅ New user created with ID:", user._id);
+      }
+    } else {
+      console.log("✅ Existing user found:", user._id);
+    }
+
+    // 3. Issue JWT Token
+    const token = generateToken(user);
+
+    res.json({
+      message: "✅ Google login successful",
+      token,
+      user: {
+        id: user._id.toString(),
+        firstname: user.firstname,
+        lastname: user.lastname,
+        username: user.username,
+        email: user.email,
+        phone: user.phone || "",
+        role: user.role,
+        status: user.status,
+        image: user.image || user.profilePicture || null,
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Google Auth Error:", err.message);
+    res.status(500).json({ error: "Server error during Google authentication: " + err.message });
+  }
+});
+
+// POST - Authenticate with Apple
+app.post("/auth/apple", async (req, res) => {
+  const { idToken, userDetails } = req.body;
+  if (!idToken) {
+    return res.status(400).json({ error: "Apple ID Token is required." });
+  }
+
+  try {
+    const payload = await verifyAppleToken(idToken);
+    if (!payload) {
+      return res.status(401).json({ error: "Invalid Apple ID Token." });
+    }
+
+    const { email, sub } = payload;
+    let firstname = payload.firstname || "Apple";
+    let lastname = payload.lastname || "User";
+
+    // If userDetails is passed from the client, parse it (it might contain name)
+    if (userDetails) {
+      try {
+        const parsed = typeof userDetails === 'string' ? JSON.parse(userDetails) : userDetails;
+        if (parsed.name) {
+          if (parsed.name.firstName) firstname = parsed.name.firstName;
+          if (parsed.name.lastName) lastname = parsed.name.lastName;
+        }
+      } catch (e) {
+        console.error("Error parsing Apple userDetails:", e);
+      }
+    }
+
+    // 1. Look for user by provider/providerId
+    let user = await db.collection("users").findOne({ provider: "apple", providerId: sub });
+
+    // 2. If not found by provider, check by email
+    if (!user) {
+      user = await db.collection("users").findOne({ email });
+      if (user) {
+        // Link the provider to the existing account
+        await db.collection("users").updateOne(
+          { _id: user._id },
+          { $set: { provider: "apple", providerId: sub } }
+        );
+        user = await db.collection("users").findOne({ _id: user._id });
+      } else {
+        // Create a new account automatically
+        const generatedUsername = await generateUniqueUsername(email, db);
+        const dummyPassword = await hash(randomBytes(16).toString("hex"), 10);
+        
+        const newUser = {
+          firstname,
+          lastname,
+          username: generatedUsername,
+          email,
+          phone: "",
+          password: dummyPassword,
+          role: "member", // default role
+          door_no: "",
+          floor_no: "",
+          apartment: "",
+          family_details: "",
+          family_members: [],
+          communication: "",
+          worker_type: "",
+          work: "",
+          seperate_work: "",
+          time: "",
+          terms: true,
+          status: "APPROVED", // Auto-approved for social login
+          provider: "apple",
+          providerId: sub,
+          createdAt: new Date()
+        };
+
+        const result = await db.collection("users").insertOne(newUser);
+        user = { ...newUser, _id: result.insertedId };
+      }
+    }
+
+    // 3. Issue JWT Token
+    const token = generateToken(user);
+
+    res.json({
+      message: "✅ Apple login successful",
+      token,
+      user: {
+        id: user._id.toString(),
+        firstname: user.firstname,
+        lastname: user.lastname,
+        username: user.username,
+        email: user.email,
+        phone: user.phone || "",
+        role: user.role,
+        status: user.status,
+        image: user.image || null,
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Apple Auth Error:", err);
+    res.status(500).json({ error: "Server error during Apple authentication." });
   }
 });
 
@@ -1920,9 +2277,194 @@ app.put("/api/notifications/:id/read", async (req, res) => {
     res.json({ message: "Notification marked as read" });
   } catch (err) {
     console.error("Error updating notification:", err);
+  }
+});
+
+// ----------------- COMPLAINTS APIs -----------------
+
+// GET all complaints
+app.get("/api/complaints", async (req, res) => {
+  try {
+    const complaints = await db.collection("complaints").find({}).sort({ createdAt: -1 }).toArray();
+    res.json(complaints);
+  } catch (err) {
+    console.error("Error fetching complaints:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// POST create a new complaint
+app.post("/api/complaints", async (req, res) => {
+  const userId = req.headers["x-user-id"];
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { title, type, description } = req.body;
+  if (!title || !type) {
+    return res.status(400).json({ error: "Issue title and category are required" });
+  }
+
+  try {
+    // Generate next ID
+    const lastComplaint = await db.collection("complaints")
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .toArray();
+
+    let nextNum = 1;
+    if (lastComplaint.length > 0) {
+      const lastId = lastComplaint[0].id;
+      const match = lastId.match(/#CMP-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    const nextId = `#CMP-${String(nextNum).padStart(3, '0')}`;
+
+    // Format current date: e.g. "Jun 24, 2026"
+    const options = { month: 'short', day: '2-digit', year: 'numeric' };
+    const formattedDate = new Date().toLocaleDateString('en-US', options);
+
+    const newComplaint = {
+      id: nextId,
+      title,
+      type,
+      description: description || "",
+      status: "Pending",
+      date: formattedDate,
+      userId: userId,
+      createdAt: new Date()
+    };
+
+    const result = await db.collection("complaints").insertOne(newComplaint);
+    res.status(201).json({ ...newComplaint, _id: result.insertedId });
+  } catch (err) {
+    console.error("Error creating complaint:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// PUT update complaint status (Admin only)
+app.put("/api/complaints/:id/status", async (req, res) => {
+  const adminUserId = req.headers["x-user-id"];
+  if (!adminUserId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ error: "Status is required" });
+  }
+
+  try {
+    // Check if requester is admin
+    const requester = await db.collection("users").findOne({ _id: new ObjectId(adminUserId) });
+    if (!requester || requester.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden: Only admins can update complaint status" });
+    }
+
+    let query = {};
+    if (ObjectId.isValid(id)) {
+      query = { _id: new ObjectId(id) };
+    } else {
+      query = { id: id };
+    }
+
+    const result = await db.collection("complaints").updateOne(
+      query,
+      { $set: { status, updatedAt: new Date() } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "Complaint not found" });
+    }
+
+    res.json({ message: `Complaint status updated to ${status}` });
+  } catch (err) {
+    console.error("Error updating complaint status:", err);
+  }
+});
+
+// ----------------- SECURITY STATS & CHECKOUT APIs -----------------
+
+// GET security statistics
+app.get("/api/security/stats", async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Today's Visitors (total entered today)
+    const todayVisitors = await db.collection("visitors").countDocuments({
+      $or: [
+        { entry_time: { $gte: today } },
+        { entryTime: { $gte: today } },
+        { createdAt: { $gte: today } }
+      ]
+    });
+
+    // Visitors Inside (entered today, but no exit_time or exitTime recorded)
+    const visitorsInside = await db.collection("visitors").countDocuments({
+      $or: [
+        { entry_time: { $gte: today } },
+        { entryTime: { $gte: today } },
+        { createdAt: { $gte: today } }
+      ],
+      exit_time: { $exists: false },
+      exitTime: { $exists: false }
+    });
+
+    // Deliveries Today
+    const todayDeliveries = await db.collection("deliveries").countDocuments({
+      $or: [
+        { delivery_time: { $gte: today } },
+        { createdAt: { $gte: today } }
+      ]
+    });
+
+    // Pending Approvals (users count pending)
+    const pendingApprovals = await db.collection("users").countDocuments({
+      status: "PENDING"
+    });
+
+    res.json({
+      todayVisitors,
+      visitorsInside,
+      todayDeliveries,
+      pendingApprovals
+    });
+  } catch (err) {
+    console.error("Error fetching security stats:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// PUT checkout a visitor
+app.put("/api/visitors/:id/checkout", async (req, res) => {
+  const { id } = req.params;
+  try {
+    let query = {};
+    if (ObjectId.isValid(id)) {
+      query = { _id: new ObjectId(id) };
+    } else {
+      query = { id: id };
+    }
+
+    const result = await db.collection("visitors").updateOne(
+      query,
+      { $set: { exit_time: new Date() } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "Visitor not found" });
+    }
+
+    res.json({ message: "Visitor checked out successfully" });
+  } catch (err) {
+    console.error("Error checking out visitor:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // ----------------- SERVER START -----------------
 const PORT = 5000;
 app.listen(PORT, () => {

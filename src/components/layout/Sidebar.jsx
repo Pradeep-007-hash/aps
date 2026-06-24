@@ -15,6 +15,7 @@ export default function Sidebar() {
 
   if (user?.role === 'security') {
     menuItems = [
+      { icon: LayoutDashboard, label: 'Dashboard Stats', path: '/security/dashboard-statistics' },
       { icon: ClipboardList, label: 'Visitor Log', path: '/security/visitor-log' },
       { icon: History, label: 'View Past Visitors', path: '/security/past-visitors' },
       { icon: BellRing, label: 'Delivery Reminder', path: '/security/delivery-reminder' },
@@ -35,6 +36,7 @@ export default function Sidebar() {
 
     if (user?.role === 'admin') {
       menuItems.splice(1, 0, { icon: Users, label: 'Manage Users', path: '/admin/users' });
+      menuItems.push({ icon: History, label: 'Past Visitors', path: '/security/past-visitors' });
       menuItems.push({ icon: Megaphone, label: 'Post Announcement', path: '/admin/announcement/add' });
       menuItems.push({ icon: Megaphone, label: 'View Announcements', path: '/admin/announcements' });
     }

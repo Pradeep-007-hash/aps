@@ -3,8 +3,10 @@ import { History, Search, Download, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function PastVisitors() {
+  const { user } = useAuth();
   const [visitors, setVisitors] = useState([]);
   const [filteredVisitors, setFilteredVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,6 +16,16 @@ export default function PastVisitors() {
   useEffect(() => {
     fetchVisitors();
   }, []);
+
+  const handleCheckout = async (id) => {
+    try {
+      await api.put(`/visitors/${id}/checkout`);
+      fetchVisitors();
+    } catch (err) {
+      console.error('Failed to checkout visitor:', err);
+      alert('Failed to check out visitor.');
+    }
+  };
 
   useEffect(() => {
     if (dateFilter) {
@@ -120,12 +132,13 @@ export default function PastVisitors() {
                 <th className="px-6 py-4">Target Door</th>
                 <th className="px-6 py-4">Purpose / Vehicle</th>
                 <th className="px-6 py-4 text-right">Entry Time</th>
+                <th className="px-6 py-4 text-right">Exit / Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm">
               {filteredVisitors.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400 font-medium">
+                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400 font-medium">
                     <Search className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
                     No visitors found {dateFilter && 'for this date'}.
                   </td>
@@ -155,6 +168,27 @@ export default function PastVisitors() {
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono">
                         {(v.entry_time || v.entryTime || v.createdAt) ? new Date(v.entry_time || v.entryTime || v.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {v.exit_time || v.exitTime ? (
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-gray-200">
+                            {new Date(v.exit_time || v.exitTime).toLocaleDateString()}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 font-mono">
+                            {new Date(v.exit_time || v.exitTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </div>
+                        </div>
+                      ) : (user?.role === 'security' || user?.role === 'admin') ? (
+                        <button 
+                          onClick={() => handleCheckout(v._id || v.id)}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-xs shadow-sm cursor-pointer transition-colors"
+                        >
+                          Check Out
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 italic text-xs">Inside</span>
+                      )}
                     </td>
                   </tr>
                 ))

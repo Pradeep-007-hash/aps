@@ -25,7 +25,7 @@ export default function Dashboard() {
           setAnnouncements(data.slice(0, 3)); // show top 3
         }
 
-        if (user?.role === 'security') {
+        if (user?.role === 'security' || user?.role === 'admin') {
           // Fetch today's visitors and pending deliveries for stats
           const visRes = await api.get('/visitors');
           const delRes = await api.get('/deliveries');
@@ -95,6 +95,11 @@ export default function Dashboard() {
     { label: 'Next Meeting', value: nextMeeting, color: 'bg-gradient-to-br from-primary-400 to-primary-600 dark:from-primary-500 dark:to-primary-700' },
   ];
 
+  if (user?.role === 'admin') {
+    stats.push({ label: "Today's Visitors", value: loading ? '-' : securityStats.visitors.toString(), color: 'bg-gradient-to-br from-blue-400 to-blue-600 dark:from-blue-500 dark:to-blue-700' });
+    stats.push({ label: "Pending Deliveries", value: loading ? '-' : securityStats.deliveries.toString(), color: 'bg-gradient-to-br from-purple-400 to-purple-600 dark:from-purple-500 dark:to-purple-700' });
+  }
+
   if (user?.role === 'security') {
     return (
       <div className="space-y-8">
@@ -156,7 +161,7 @@ export default function Dashboard() {
         <p className="text-gray-500 dark:text-gray-400 mt-1 transition-colors">Overview of your apartment and activities.</p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${stats.length === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-3 xl:grid-cols-5'} gap-6`}>
         {stats.map((stat, i) => (
           <div key={i} className="glass-card p-6 flex items-center gap-5 hover:-translate-y-1 transition-transform duration-300">
             <div className={`w-3 h-16 rounded-full shadow-inner ${stat.color}`}></div>

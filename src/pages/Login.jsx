@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../components/common/Button';
 import { Home, Mail, Lock, User, Key } from 'lucide-react';
 import cityscapeBg from '../assets/login_bg.png';
 import { useAuth } from '../context/AuthContext';
+import SocialLogin from '../components/common/SocialLogin';
 
 const API_URL = "http://localhost:5000";
 
@@ -18,6 +19,23 @@ export default function Login() {
 
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  // Handle Google OAuth success
+  const handleSocialAuthSuccess = (data) => {
+    if (data.user && data.token) {
+      setMessage(data.message || "✅ Sign in successful!");
+      login(data.user, data.token);
+      
+      setTimeout(() => {
+        navigate(data.user.role === 'security' ? "/security/visitor-log" : "/dashboard");
+      }, 500);
+    }
+  };
+
+  // Handle Google OAuth failure
+  const handleSocialAuthFailure = (errorMsg) => {
+    setMessage(`❌ ${errorMsg}`);
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -36,7 +54,7 @@ export default function Login() {
 
       if (res.ok) {
         setMessage(data.message);
-        login({ id: data.user.id, role: data.user.role, firstname: data.user.firstname, username: data.user.username, image: data.user.image });
+        login(data.user, data.token);
 
         setTimeout(() => {
             navigate(data.user.role === 'security' ? "/security/visitor-log" : "/dashboard");
@@ -52,7 +70,7 @@ export default function Login() {
     }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleEmailOTPStart = () => {
       setMessage("");
       setGoogleFlowStep('email');
   };
@@ -100,7 +118,7 @@ export default function Login() {
 
         if (data.success && data.user) {
             setMessage("OTP verified. Successfully signed in!");
-            login({ id: data.user.id, role: data.user.role, firstname: data.user.firstname, username: data.user.username, image: data.user.image });
+            login(data.user, data.token);
 
             setTimeout(() => {
                 navigate(data.user.role === 'security' ? "/security/visitor-log" : "/dashboard");
@@ -128,19 +146,19 @@ export default function Login() {
             </div>
           </div>
           
-          <h2 className="text-3xl font-extrabold text-center text-gray-900 font-sans tracking-tight mb-2">Welcome Back</h2>
-          <p className="text-center text-gray-500 font-medium mb-8">Sign in to your apartment portal</p>
+          <h2 className="text-3xl font-extrabold text-center text-gray-900 dark:text-white font-sans tracking-tight mb-2">Welcome Back</h2>
+          <p className="text-center text-gray-500 dark:text-gray-400 font-medium mb-8">Sign in to your apartment portal</p>
           
           {message && (
             <div className={`mb-6 p-4 rounded-xl text-sm font-medium ${message.includes("error") || message.includes("failed") || message.includes("Invalid") || message.includes("Server") ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
               {message}
             </div>
           )}
-
+ 
           {googleFlowStep === 'default' && (
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-gray-700 ml-1">Username</label>
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Username</label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input 
@@ -149,7 +167,7 @@ export default function Login() {
                     onChange={(e) => setUsername(e.target.value)}
                     required
                     disabled={loading}
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-gray-900"
+                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-gray-900 dark:text-white"
                     placeholder="Enter your username"
                   />
                 </div>
@@ -157,8 +175,8 @@ export default function Login() {
               
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center ml-1">
-                  <label className="text-sm font-bold text-gray-700">Password</label>
-                  <Link to="/forgot-password" className="text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors">Forgot password?</Link>
+                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Password</label>
+                  <Link to="/forgot-password" className="text-sm font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 transition-colors">Forgot password?</Link>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -168,7 +186,7 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={loading}
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-gray-900"
+                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-gray-900 dark:text-white"
                     placeholder="••••••••"
                   />
                 </div>
@@ -177,29 +195,25 @@ export default function Login() {
               <Button type="submit" disabled={loading} className="w-full py-3.5 text-lg font-bold rounded-2xl mt-4 disabled:opacity-70 disabled:cursor-not-allowed">
                 {loading ? 'Signing In...' : 'Sign In'}
               </Button>
-
+ 
               <div className="relative flex items-center py-4">
-                <div className="flex-grow border-t border-gray-200"></div>
-                <span className="flex-shrink-0 mx-4 text-gray-400 text-sm font-bold uppercase tracking-wider">Or continue with</span>
-                <div className="flex-grow border-t border-gray-200"></div>
+                <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+                <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-sm font-bold uppercase tracking-wider">Or continue with</span>
+                <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
               </div>
-
-              <button 
-                type="button" 
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 rounded-2xl text-gray-700 font-bold text-lg hover:bg-gray-50 focus:ring-2 focus:ring-gray-200 transition-all shadow-sm"
-              >
-                <Mail className="w-5 h-5 text-indigo-500" />
-                Email OTP
-              </button>
+ 
+              <SocialLogin 
+                onAuthStart={() => setLoading(true)}
+                onAuthSuccess={handleSocialAuthSuccess}
+                onAuthFailure={handleSocialAuthFailure}
+              />
             </form>
           )}
-
+ 
           {googleFlowStep === 'email' && (
             <form onSubmit={handleEmailSubmit} className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-gray-700 ml-1">Email for OTP Verification</label>
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Email for OTP Verification</label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input 
@@ -208,7 +222,7 @@ export default function Login() {
                     onChange={(e) => setGoogleEmail(e.target.value)}
                     required
                     disabled={loading}
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-gray-900"
+                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-gray-900 dark:text-white"
                     placeholder="Enter registered email"
                   />
                 </div>
@@ -220,18 +234,18 @@ export default function Login() {
                 type="button" 
                 onClick={() => { setGoogleFlowStep('default'); setMessage(''); }} 
                 disabled={loading}
-                className="w-full py-3.5 bg-gray-100 text-gray-700 font-bold rounded-2xl hover:bg-gray-200 transition-colors"
+                className="w-full py-3.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold rounded-2xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>
             </form>
           )}
-
+ 
           {googleFlowStep === 'otp' && (
             <form onSubmit={handleOTPSubmit} className="space-y-5">
-              <p className="text-center text-sm text-gray-600 mb-4">An OTP has been sent to <strong>{googleEmail}</strong>.</p>
+              <p className="text-center text-sm text-gray-600 dark:text-gray-400 mb-4">An OTP has been sent to <strong>{googleEmail}</strong>.</p>
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-gray-700 ml-1">One-Time Password (OTP)</label>
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">One-Time Password (OTP)</label>
                 <div className="relative">
                   <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input 
@@ -241,7 +255,7 @@ export default function Login() {
                     required
                     maxLength="6"
                     disabled={loading}
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-gray-900 text-center tracking-widest text-xl"
+                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium text-gray-900 dark:text-white text-center tracking-widest text-xl"
                     placeholder="------"
                   />
                 </div>
@@ -253,7 +267,7 @@ export default function Login() {
                 type="button" 
                 onClick={() => { setGoogleFlowStep('email'); setMessage(''); setOtp(''); }} 
                 disabled={loading}
-                className="w-full py-3.5 bg-gray-100 text-gray-700 font-bold rounded-2xl hover:bg-gray-200 transition-colors"
+                className="w-full py-3.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold rounded-2xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 Back / Resend OTP
               </button>
@@ -261,9 +275,9 @@ export default function Login() {
           )}
           
           {googleFlowStep === 'default' && (
-            <p className="text-center text-gray-500 font-medium mt-8">
+            <p className="text-center text-gray-500 dark:text-gray-400 font-medium mt-8">
               Don't have an account?{' '}
-              <Link to="/register" className="text-primary-600 font-bold hover:text-primary-700 transition-colors">Create account</Link>
+              <Link to="/register" className="text-primary-600 dark:text-primary-400 font-bold hover:text-primary-700 transition-colors">Create account</Link>
             </p>
           )}
         </div>

@@ -1,8 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import AppLayout from './components/layout/AppLayout';
 import PublicLayout from './components/layout/PublicLayout';
 import Dashboard from './pages/Dashboard';
 import Complaints from './pages/Complaints';
+import NewComplaint from './pages/NewComplaint';
 import Bills from './pages/Bills';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -26,13 +28,17 @@ import VisitorLog from './pages/VisitorLog';
 import PastVisitors from './pages/PastVisitors';
 import DeliveryReminder from './pages/DeliveryReminder';
 import DeliveryLog from './pages/DeliveryLog';
+import SecurityStats from './pages/SecurityStats';
 
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
   return (
-    <AuthProvider>
-      <Router>
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <AuthProvider>
+        <Router>
         <Routes>
           <Route element={<PublicLayout />}>
             <Route path="/" element={<LandingPage />} />
@@ -49,6 +55,7 @@ function App() {
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/complaints" element={<Complaints />} />
+            <Route path="/complaints/new" element={<NewComplaint />} />
             <Route path="/bills" element={<Bills />} />
             <Route path="/events" element={<Events />} />
             <Route path="/events/edit/:id" element={<EditEvent />} />
@@ -62,6 +69,7 @@ function App() {
             <Route path="/admin/announcements" element={<ViewAnnouncements />} />
             
             {/* Security Routes */}
+            <Route path="/security/dashboard-statistics" element={<SecurityStats />} />
             <Route path="/security/visitor-log" element={<VisitorLog />} />
             <Route path="/security/past-visitors" element={<PastVisitors />} />
             <Route path="/security/delivery-reminder" element={<DeliveryReminder />} />
@@ -73,6 +81,7 @@ function App() {
         </Routes>
       </Router>
     </AuthProvider>
+  </GoogleOAuthProvider>
   );
 }
 
