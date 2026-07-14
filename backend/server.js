@@ -24,26 +24,24 @@ const app = express();
 
 // ----------------- CORS Setup -----------------
 const allowedOrigins = [
-  "http://localhost:5173", 
-  "http://localhost:5174"
-];
+    "http://localhost:5173",
+    "http://localhost:5174",
+    process.env.FRONTEND_URL
+].filter(Boolean);
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-};
+app.use(cors({
+    origin: function(origin, callback){
 
-// Enable CORS for all routes (this automatically handles preflight requests as well)
-app.use(cors(corsOptions));
+        if(!origin)
+            return callback(null,true);
+
+        if(allowedOrigins.includes(origin))
+            return callback(null,true);
+
+        callback(new Error("Not allowed by CORS"));
+    },
+    credentials:true
+}));
 
 app.use(json());
 app.use(bodyParser.json()); // Ensure bodyParser is used
@@ -53,8 +51,11 @@ const storage = memoryStorage();
 const upload = multer({ storage: storage });
 
 // ----------------- MongoDB CONNECTION -----------------
-const fallbackUri = "mongodb+srv://2312034:Pradeep@pradeepdatabase.iszxesl.mongodb.net/?retryWrites=true&w=majority&appName=PradeepDatabase";
-const uri = process.env.MONGO_URI || fallbackUri;
+const uri = process.env.MONGO_URI;
+if (!uri) {
+  console.error("❌ MONGO_URI environment variable is missing!");
+  process.exit(1);
+}
 const client = new MongoClient(uri);
 
 let db;
@@ -148,8 +149,8 @@ connectDB();
 const transporter = nodemailer.createTransport({
     service: 'gmail', 
     auth: {
-        user: 'athulpalanichamy076@gmail.com', // <-- REPLACE THIS
-        pass: 'jrlr kwjc ddbb zgff' // <-- REPLACE THIS
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     }
 });
 // ------------------------------------------------------------------------------------------------
@@ -161,6 +162,10 @@ function generateOTP() {
 
 // Generate signed JWT token
 function generateToken(user) {
+  if (!process.env.JWT_SECRET) {
+    console.error("❌ JWT_SECRET is not defined!");
+    throw new Error("JWT_SECRET is missing");
+  }
   return jwt.sign(
     { 
       user: { 
@@ -168,7 +173,7 @@ function generateToken(user) {
         role: user.role 
       } 
     },
-    process.env.JWT_SECRET || "your_jwt_secret_key_here",
+    process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
 }
@@ -2466,7 +2471,7 @@ app.put("/api/visitors/:id/checkout", async (req, res) => {
 });
 
 // ----------------- SERVER START -----------------
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
