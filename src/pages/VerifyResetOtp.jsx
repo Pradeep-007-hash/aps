@@ -4,7 +4,7 @@ import Button from '../components/common/Button';
 import { Key, ArrowLeft, Home, Mail } from 'lucide-react';
 import cityscapeBg from '../assets/login_bg.png';
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function VerifyResetOtp() {
   const navigate = useNavigate();

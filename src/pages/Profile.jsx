@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import Button from '../components/common/Button';
 import { User, Mail, Phone, Home, Upload, X, ShieldCheck, Settings } from 'lucide-react';
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Profile() {
   const { user, login } = useAuth(); // login function securely saves to context

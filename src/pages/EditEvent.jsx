@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Button from '../components/common/Button';
 import { Calendar as CalendarIcon, MapPin, Clock, Tag, User, Phone, Image as ImageIcon } from 'lucide-react';
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function EditEvent() {
   const { id } = useParams();

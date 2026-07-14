@@ -6,7 +6,7 @@ import cityscapeBg from '../assets/login_bg.png';
 import { useAuth } from '../context/AuthContext';
 import SocialLogin from '../components/common/SocialLogin';
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Login() {
   const [username, setUsername] = useState("");

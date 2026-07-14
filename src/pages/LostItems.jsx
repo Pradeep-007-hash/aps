@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Package, Calendar, User, Phone, Trash2, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function LostItems() {
   const [items, setItems] = useState([]);

@@ -16,7 +16,7 @@ export default function SocialLogin({ onAuthStart, onAuthSuccess, onAuthFailure 
       console.log("📦 Credential received from Google");
 
       // Send the ID token to your backend for verification
-      const response = await fetch("http://localhost:5000/auth/google", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/auth/google`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -43,7 +43,7 @@ export default function Register() {
   const handleSocialAuth = async (provider, token) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/auth/${provider}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/auth/${provider}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken: token }),
@@ -88,7 +88,7 @@ export default function Register() {
     if (formData.password !== formData.confirm_password) return alert("Passwords do not match!");
     if (!/^\\d{10}$/.test(formData.phone)) return alert("Please enter a valid 10-digit phone number.");
     try {
-      const res = await fetch("http://localhost:5000/signup", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/signup`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });

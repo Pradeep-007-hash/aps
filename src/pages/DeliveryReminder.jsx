@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BellRing, Send, AlertCircle, CheckCircle, User, Phone, Package, Home, Tag } from 'lucide-react';
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function DeliveryReminder() {
   const [formData, setFormData] = useState({

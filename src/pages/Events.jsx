@@ -4,7 +4,7 @@ import { Calendar, MapPin, User, Tag, Heart, MessageCircle, Edit, Trash2, Phone,
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/common/Button';
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Events({ isPast = false }) {
   const { user } = useAuth();
