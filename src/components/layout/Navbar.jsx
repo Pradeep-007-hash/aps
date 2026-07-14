@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, Search, Sun, Moon, Package } from 'lucide-react';
+import { Bell, Search, Sun, Moon, Package, Menu } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
-export default function Navbar() {
+export default function Navbar({ onMenuClick }) {
   const { user } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -56,7 +56,15 @@ export default function Navbar() {
 
   return (
     <header className="h-20 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 sticky top-0 z-30 px-8 flex items-center justify-between transition-colors duration-300">
-      <div className="flex items-center gap-6 flex-1">
+      <div className="flex items-center gap-4 md:gap-6 flex-1">
+        <button 
+          onClick={onMenuClick}
+          className="p-2 -ml-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl md:hidden"
+          aria-label="Open sidebar"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+        
         <div className="relative w-full max-w-md hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input 
