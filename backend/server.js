@@ -30,17 +30,8 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-    origin: function(origin, callback){
-
-        if(!origin)
-            return callback(null,true);
-
-        if(allowedOrigins.includes(origin))
-            return callback(null,true);
-
-        callback(new Error("Not allowed by CORS"));
-    },
-    credentials:true
+    origin: allowedOrigins,
+    credentials: true
 }));
 
 app.use(json());
