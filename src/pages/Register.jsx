@@ -86,7 +86,7 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.password !== formData.confirm_password) return alert("Passwords do not match!");
-    if (!/^\\d{10}$/.test(formData.phone)) return alert("Please enter a valid 10-digit phone number.");
+    if (!/^\d{10}$/.test(formData.phone)) return alert("Please enter a valid 10-digit phone number.");
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/signup`, {
         method: "POST", headers: { "Content-Type": "application/json" },
